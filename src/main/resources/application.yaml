@@ -1,3 +1,66 @@
 spring:
   application:
     name: messaging-attachment-service
+  config:
+    import: "optional:file:.env[.properties]"
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5436}/${DB_NAME:attachment_db}
+    username: ${DB_USER:attachment_service}
+    password: ${DB_PASSWORD}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    consumer:
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+
+server:
+  port: ${ATTACHMENT_SERVICE_PORT:8086}
+  shutdown: graceful
+
+badrlink:
+  kafka:
+    enabled: ${KAFKA_ENABLED:true}
+    outbox:
+      batch-size: ${KAFKA_RELAY_BATCH:100}
+      max-attempts: ${KAFKA_RELAY_MAX_ATTEMPTS:5}
+  attachment:
+    max-file-size-bytes: ${ATTACHMENT_MAX_FILE_SIZE_BYTES:26214400}
+    default-page-size: 30
+    max-page-size: 100
+    upload-url-ttl: ${ATTACHMENT_UPLOAD_URL_TTL:5m}
+    download-url-ttl: ${ATTACHMENT_DOWNLOAD_URL_TTL:10m}
+    scan:
+      interval: ${ATTACHMENT_SCAN_INTERVAL:5s}
+      batch-size: ${ATTACHMENT_SCAN_BATCH:20}
+      max-attempts: ${ATTACHMENT_SCAN_MAX_ATTEMPTS:5}
+    minio:
+      endpoint: ${MINIO_ENDPOINT:http://localhost:9000}
+      access-key: ${MINIO_ACCESS_KEY:}
+      secret-key: ${MINIO_SECRET_KEY:}
+      bucket: ${MINIO_ATTACHMENT_BUCKET:badrlink-attachments}
+      quarantine-bucket: ${MINIO_QUARANTINE_BUCKET:badrlink-quarantine}
+      initialize-buckets: ${MINIO_INITIALIZE_BUCKETS:true}
+  chat-service:
+    base-url: ${CHAT_SERVICE_BASE_URL:http://localhost:8083}
+    room-path: /rooms/{roomId}
+    attachments-path: /internal/messages/{messageId}/attachments
+    internal-token-header: X-BadrLink-Internal-Token
+    internal-token: ${CHAT_INTERNAL_SERVICE_TOKEN:}
+    connect-timeout: 2s
+    read-timeout: 3s
+  security:
+    jwt:
+      jwk-set-uri: ${JWT_JWK_SET_URI:http://localhost:8081/oauth2/jwks}
+      hmac-secret: ${JWT_HMAC_SECRET:}
+
+logging:
+  level:
+    com.ziyadsamhaoui.messagingattachmentservice: INFO
