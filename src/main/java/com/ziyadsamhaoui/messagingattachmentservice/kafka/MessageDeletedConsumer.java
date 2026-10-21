@@ -15,14 +15,6 @@ import org.springframework.util.StringUtils;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
-/**
- * Tombstones attachments when Chat deletes a message. The event catalog already
- * declares MESSAGE_DELETED as an event consumers must act on rather than ignore.
- *
- * Failures are left unacknowledged so the container retries; the cleanup itself is
- * idempotent, so a redelivery after a partial success finishes the remaining work
- * instead of deleting something twice.
- */
 @Component
 @ConditionalOnProperty(prefix = "badrlink.kafka", name = "enabled", havingValue = "true")
 public class MessageDeletedConsumer {

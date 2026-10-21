@@ -36,11 +36,6 @@ public class ChatServiceClient {
                 .build();
     }
 
-    /**
-     * Chat is the authority on room membership. The caller's own bearer token is
-     * forwarded, so a revoked participant is denied on the next request instead of
-     * being remembered in a local cache.
-     */
     public void requireRoomAccess(String roomId, String authorization) {
         if (!StringUtils.hasText(authorization)) {
             throw new UnauthenticatedRequestException("A bearer token is required to access a room");

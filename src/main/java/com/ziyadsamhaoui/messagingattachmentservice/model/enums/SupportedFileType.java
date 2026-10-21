@@ -5,16 +5,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 
-/**
- * The file types this service accepts, with the MIME values that map onto them.
- *
- * Browsers report the same container under more than one MIME type: MediaRecorder
- * produces {@code audio/webm;codecs=opus}, and Ogg recordings arrive as
- * {@code audio/ogg} or {@code application/ogg}. Parameters are stripped before the
- * lookup, and the aliases below map those declarations onto the canonical type
- * instead of rejecting a recording whose MIME string differs from the container
- * name.
- */
 public enum SupportedFileType {
     JPEG("image/jpeg", "jpg", Map.of("image/jpg", true, "image/pjpeg", true)),
     PNG("image/png", "png", Map.of()),

@@ -57,11 +57,6 @@ public class AttachmentLifecycleService {
         IGNORED
     }
 
-    /**
-     * Runs the checks outside a database lock, then applies the verdict in a short
-     * transaction that only succeeds while the row is still PENDING_SCAN. Two workers
-     * racing on the same row therefore produce one transition and one event.
-     */
     public ScanOutcome scan(UUID attachmentId) {
         Attachment snapshot = transactionTemplate.execute(status -> attachmentRepository.lockById(attachmentId)
                 .filter(attachment -> attachment.getStatus() == FileStatus.PENDING_SCAN)
@@ -152,11 +147,6 @@ public class AttachmentLifecycleService {
         return ScanOutcome.REJECTED;
     }
 
-    /**
-     * Chat is updated after the metadata transaction commits. A failure leaves
-     * {@code chatSyncedAt} empty, so the scheduled retry can publish the update again
-     * instead of the attachment silently staying invisible in the conversation.
-     */
     public boolean syncReady(UUID attachmentId) {
         Attachment attachment = attachmentRepository.findById(attachmentId).orElse(null);
         if (attachment == null || attachment.getStatus() != FileStatus.READY
@@ -186,11 +176,6 @@ public class AttachmentLifecycleService {
         return Boolean.TRUE.equals(updated);
     }
 
-    /**
-     * Moves rejected bytes out of the live bucket. The metadata is already REJECTED
-     * and can never be downloaded; if the move fails, {@code quarantinedAt} stays
-     * empty and the scheduled retry keeps trying until the object is quarantined.
-     */
     public boolean quarantine(UUID attachmentId) {
         Attachment attachment = attachmentRepository.findById(attachmentId).orElse(null);
         if (attachment == null || attachment.getStatus() != FileStatus.REJECTED
@@ -220,11 +205,6 @@ public class AttachmentLifecycleService {
         return Boolean.TRUE.equals(updated);
     }
 
-    /**
-     * Removes the bytes and metadata for a deleted message. Every step is idempotent:
-     * a retry after a partial failure deletes what is left and skips objects that are
-     * already gone.
-     */
     public int deleteForMessage(String messageId) {
         List<Attachment> attachments = attachmentRepository.findByMessageIdOrderByCreatedAtAsc(messageId);
         if (attachments.isEmpty()) {
