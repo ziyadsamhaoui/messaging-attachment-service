@@ -34,7 +34,7 @@ public interface AttachmentRepository extends JpaRepository<Attachment, UUID> {
             select * from attachments
             where room_id = :roomId
               and status = 'READY'
-              and (:cursorAt is null
+              and (cast(:cursorAt as timestamptz) is null
                    or (uploaded_at, id) < (cast(:cursorAt as timestamptz), cast(:cursorId as uuid)))
             order by uploaded_at desc, id desc
             limit :batch
