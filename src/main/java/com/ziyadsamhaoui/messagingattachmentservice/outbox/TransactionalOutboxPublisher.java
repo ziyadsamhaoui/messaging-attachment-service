@@ -1,5 +1,7 @@
 package com.ziyadsamhaoui.messagingattachmentservice.outbox;
 
+import com.ziyadsamhaoui.messagingattachmentservice.observability.TraceContextCarrier;
+import com.ziyadsamhaoui.messagingattachmentservice.web.CorrelationContext;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -23,6 +25,8 @@ public class TransactionalOutboxPublisher {
                 .eventType(eventType)
                 .eventVersion(EventEnvelope.VERSION_1)
                 .payload(objectMapper.writeValueAsString(payload))
+                .correlationId(CorrelationContext.current())
+                .traceParent(TraceContextCarrier.currentTraceParent())
                 .build());
     }
 }

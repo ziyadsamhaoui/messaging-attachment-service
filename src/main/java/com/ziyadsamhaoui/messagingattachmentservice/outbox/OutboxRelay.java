@@ -3,11 +3,16 @@ package com.ziyadsamhaoui.messagingattachmentservice.outbox;
 import static com.ziyadsamhaoui.messagingattachmentservice.outbox.OutboxStatus.FAILED_DEAD_LETTER;
 import static com.ziyadsamhaoui.messagingattachmentservice.outbox.OutboxStatus.PENDING;
 
+import com.ziyadsamhaoui.messagingattachmentservice.observability.TraceContextCarrier;
+import io.opentelemetry.context.Context;
+import io.opentelemetry.context.Scope;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.kafka.clients.producer.ProducerRecord;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -60,8 +65,25 @@ public class OutboxRelay {
     }
 
     private void send(OutboxEvent event) throws Exception {
-        String envelopeJson = objectMapper.writeValueAsString(toEnvelope(event));
-        kafkaTemplate.send(AttachmentEvents.TOPIC, event.getAggregateId(), envelopeJson).get(10, TimeUnit.SECONDS);
+        ProducerRecord<String, String> record = new ProducerRecord<>(AttachmentEvents.TOPIC,
+                event.getAggregateId(), objectMapper.writeValueAsString(toEnvelope(event)));
+
+        // Written explicitly so the header exists even without the agent; the agent adds its own
+        // traceparent once the stored context is current below, and both carry the same trace id.
+        if (event.getTraceParent() != null) {
+            record.headers().add(TraceContextCarrier.TRACEPARENT,
+                    event.getTraceParent().getBytes(StandardCharsets.UTF_8));
+        }
+
+        Context originating = TraceContextCarrier.extract(event.getTraceParent());
+        if (originating == null) {
+            kafkaTemplate.send(record).get(10, TimeUnit.SECONDS);
+            return;
+        }
+
+        try (Scope scope = originating.makeCurrent()) {
+            kafkaTemplate.send(record).get(10, TimeUnit.SECONDS);
+        }
     }
 
     private void recordFailure(OutboxEvent event, Exception ex) {
