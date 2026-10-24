@@ -25,6 +25,29 @@ server:
   port: ${ATTACHMENT_SERVICE_PORT:8086}
   shutdown: graceful
 
+# Actuator is served on its own port: Prometheus scrapes it over the Docker network and the
+# application port keeps the existing security configuration untouched.
+management:
+  server:
+    port: ${MANAGEMENT_PORT:9090}
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: never
+      # Readiness covers PostgreSQL and MinIO (the custom `minio` indicator); liveness stays
+      # on readinessState.
+      group:
+        readiness:
+          include: readinessState,db,minio
+  metrics:
+    tags:
+      application: ${spring.application.name}
+
 badrlink:
   kafka:
     enabled: ${KAFKA_ENABLED:true}
@@ -60,7 +83,21 @@ badrlink:
     jwt:
       jwk-set-uri: ${JWT_JWK_SET_URI:http://localhost:8081/oauth2/jwks}
       hmac-secret: ${JWT_HMAC_SECRET:}
+  observability:
+    outbox:
+      refresh-interval: ${OUTBOX_METRICS_INTERVAL:15s}
+    kafka-lag:
+      refresh-interval: ${KAFKA_LAG_METRICS_INTERVAL:15s}
+      group-id: attachment-service
 
+# Structured JSON logs. The OpenTelemetry agent supplies trace_id/span_id through the MDC.
 logging:
+  structured:
+    format:
+      console: logstash
+    json:
+      context:
+        include: true
+        prefix: ""
   level:
     com.ziyadsamhaoui.messagingattachmentservice: INFO

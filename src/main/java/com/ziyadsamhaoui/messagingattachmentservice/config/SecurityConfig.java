@@ -34,7 +34,13 @@ public class SecurityConfig {
     SecurityFilterChain attachmentServiceSecurityFilterChain(HttpSecurity http) throws Exception {
         http.csrf(csrf -> csrf.disable())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .authorizeHttpRequests(authorize -> authorize.anyRequest().authenticated())
+                .authorizeHttpRequests(authorize -> authorize
+                        // Actuator runs on its own, unpublished management port; permitting it
+                        // here is what lets Prometheus scrape and the health probe run.
+                        .requestMatchers("/actuator/health", "/actuator/health/**", "/actuator/prometheus",
+                                "/actuator/info")
+                        .permitAll()
+                        .anyRequest().authenticated())
                 .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> jwt.decoder(jwtDecoder())));
         return http.build();
     }
