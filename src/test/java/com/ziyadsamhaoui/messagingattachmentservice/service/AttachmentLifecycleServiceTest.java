@@ -30,6 +30,7 @@ import com.ziyadsamhaoui.messagingattachmentservice.scanner.ContentModerator;
 import com.ziyadsamhaoui.messagingattachmentservice.scanner.MalwareScanner;
 import com.ziyadsamhaoui.messagingattachmentservice.storage.ObjectStorage;
 import com.ziyadsamhaoui.messagingattachmentservice.storage.ObjectStorageException;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -63,7 +64,7 @@ class AttachmentLifecycleServiceTest {
         properties = AttachmentUploadServiceTest.properties(3);
         service = new AttachmentLifecycleService(attachmentRepository, objectStorage, malwareScanner,
                 contentModerator, chatServiceClient, properties, outboxPublisher,
-                new TransactionTemplate(mock(PlatformTransactionManager.class)));
+                new TransactionTemplate(mock(PlatformTransactionManager.class)), new SimpleMeterRegistry());
     }
 
     @Test

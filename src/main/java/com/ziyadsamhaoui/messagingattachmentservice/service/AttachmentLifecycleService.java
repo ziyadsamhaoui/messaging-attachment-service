@@ -13,6 +13,9 @@ import com.ziyadsamhaoui.messagingattachmentservice.scanner.ContentModerator;
 import com.ziyadsamhaoui.messagingattachmentservice.scanner.MalwareScanner;
 import com.ziyadsamhaoui.messagingattachmentservice.storage.ObjectStorage;
 import com.ziyadsamhaoui.messagingattachmentservice.storage.ObjectStorageException;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -35,11 +38,12 @@ public class AttachmentLifecycleService {
     private final AttachmentProperties properties;
     private final TransactionalOutboxPublisher outboxPublisher;
     private final TransactionTemplate transactionTemplate;
+    private final Timer readyLatency;
 
     public AttachmentLifecycleService(AttachmentRepository attachmentRepository, ObjectStorage objectStorage,
             MalwareScanner malwareScanner, ContentModerator contentModerator, ChatServiceClient chatServiceClient,
             AttachmentProperties properties, TransactionalOutboxPublisher outboxPublisher,
-            TransactionTemplate transactionTemplate) {
+            TransactionTemplate transactionTemplate, MeterRegistry meterRegistry) {
         this.attachmentRepository = attachmentRepository;
         this.objectStorage = objectStorage;
         this.malwareScanner = malwareScanner;
@@ -48,6 +52,10 @@ public class AttachmentLifecycleService {
         this.properties = properties;
         this.outboxPublisher = outboxPublisher;
         this.transactionTemplate = transactionTemplate;
+        this.readyLatency = Timer.builder("badrlink.attachment.ready.latency")
+                .description("Time from upload confirmation to the attachment becoming READY")
+                .publishPercentileHistogram()
+                .register(meterRegistry);
     }
 
     public enum ScanOutcome {
@@ -105,6 +113,7 @@ public class AttachmentLifecycleService {
         attachmentRepository.save(attachment);
 
         if (safe) {
+            recordReadyLatency(attachment);
             outboxPublisher.publish(attachment.getId().toString(), AttachmentEvents.FILE_READY,
                     new AttachmentEvents.FileReady(attachment.getId().toString(), attachment.getRoomId(),
                             attachment.getMessageId(), attachment.getUserId().toString(),
@@ -118,6 +127,20 @@ public class AttachmentLifecycleService {
                         attachment.getMessageId(), attachment.getUserId().toString(), attachment.getFileName(),
                         malware.name(), moderation.name(), attachment.getScannedAt()));
         return ScanOutcome.REJECTED;
+    }
+
+    /**
+     * Measures the real scan lifecycle: from the moment the uploader confirmed the object to the
+     * moment the verdict made the attachment usable. Scans are polled, so this is the latency an
+     * end user actually experiences, not just the scanner call.
+     */
+    private void recordReadyLatency(Attachment attachment) {
+        Instant uploadedAt = attachment.getUploadedAt();
+        Instant scannedAt = attachment.getScannedAt();
+        if (uploadedAt == null || scannedAt == null || scannedAt.isBefore(uploadedAt)) {
+            return;
+        }
+        readyLatency.record(Duration.between(uploadedAt, scannedAt));
     }
 
     private ScanOutcome recordScanFailure(UUID attachmentId, RuntimeException exception) {

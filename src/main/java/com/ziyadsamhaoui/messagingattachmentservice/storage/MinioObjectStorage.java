@@ -10,6 +10,11 @@ import io.minio.StatObjectArgs;
 import io.minio.StatObjectResponse;
 import io.minio.errors.ErrorResponseException;
 import io.minio.http.Method;
+import io.opentelemetry.api.GlobalOpenTelemetry;
+import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.api.trace.StatusCode;
+import io.opentelemetry.api.trace.Tracer;
+import io.opentelemetry.context.Scope;
 import java.time.Duration;
 import java.util.Optional;
 import java.util.Set;
@@ -29,6 +34,13 @@ public class MinioObjectStorage implements ObjectStorage {
     private final MinioClient client;
     private final String bucket;
     private final String quarantineBucket;
+
+    /**
+     * The MinIO SDK signs URLs locally and performs its HEAD/GET calls through OkHttp, so the
+     * agent can only see the network calls. These spans describe the logical storage operation,
+     * which is what a slow or failing upload actually needs to be diagnosed.
+     */
+    private final Tracer tracer = GlobalOpenTelemetry.get().getTracer("messaging-attachment-service");
 
     public MinioObjectStorage(MinioClient client, AttachmentProperties properties) {
         this.client = client;
@@ -52,7 +64,12 @@ public class MinioObjectStorage implements ObjectStorage {
     }
 
     private String presigned(Method method, String targetBucket, String objectKey, Duration ttl) {
-        try {
+        Span span = tracer.spanBuilder("attachment.presign")
+                .setAttribute("attachment.storage.operation", "presign")
+                .setAttribute("attachment.storage.bucket", targetBucket)
+                .setAttribute("attachment.storage.method", method.name())
+                .startSpan();
+        try (Scope ignored = span.makeCurrent()) {
             return client.getPresignedObjectUrl(GetPresignedObjectUrlArgs.builder()
                     .method(method)
                     .bucket(targetBucket)
@@ -60,25 +77,41 @@ public class MinioObjectStorage implements ObjectStorage {
                     .expiry((int) ttl.toSeconds(), TimeUnit.SECONDS)
                     .build());
         } catch (Exception exception) {
+            span.setStatus(StatusCode.ERROR, "presign failed");
+            span.recordException(exception);
             throw new ObjectStorageException("Could not sign a URL for " + objectKey, exception);
+        } finally {
+            span.end();
         }
     }
 
     @Override
     public Optional<StoredObject> stat(String objectKey) {
-        try {
+        Span span = tracer.spanBuilder("attachment.stat")
+                .setAttribute("attachment.storage.operation", "stat")
+                .setAttribute("attachment.storage.bucket", bucket)
+                .startSpan();
+        try (Scope ignored = span.makeCurrent()) {
             StatObjectResponse response = client.statObject(StatObjectArgs.builder()
                     .bucket(bucket)
                     .object(objectKey)
                     .build());
+            span.setAttribute("attachment.storage.object_present", true);
             return Optional.of(new StoredObject(response.size(), response.contentType()));
         } catch (ErrorResponseException exception) {
             if (MISSING_CODES.contains(exception.errorResponse().code())) {
+                span.setAttribute("attachment.storage.object_present", false);
                 return Optional.empty();
             }
+            span.setStatus(StatusCode.ERROR, "stat failed");
+            span.recordException(exception);
             throw new ObjectStorageException("Could not stat " + objectKey, exception);
         } catch (Exception exception) {
+            span.setStatus(StatusCode.ERROR, "stat failed");
+            span.recordException(exception);
             throw new ObjectStorageException("Could not stat " + objectKey, exception);
+        } finally {
+            span.end();
         }
     }
 
