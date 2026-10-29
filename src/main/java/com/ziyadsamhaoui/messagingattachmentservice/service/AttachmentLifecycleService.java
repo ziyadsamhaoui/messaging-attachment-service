@@ -129,11 +129,6 @@ public class AttachmentLifecycleService {
         return ScanOutcome.REJECTED;
     }
 
-    /**
-     * Measures the real scan lifecycle: from the moment the uploader confirmed the object to the
-     * moment the verdict made the attachment usable. Scans are polled, so this is the latency an
-     * end user actually experiences, not just the scanner call.
-     */
     private void recordReadyLatency(Attachment attachment) {
         Instant uploadedAt = attachment.getUploadedAt();
         Instant scannedAt = attachment.getScannedAt();

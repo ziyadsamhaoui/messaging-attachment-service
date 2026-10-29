@@ -35,11 +35,6 @@ public class MinioObjectStorage implements ObjectStorage {
     private final String bucket;
     private final String quarantineBucket;
 
-    /**
-     * The MinIO SDK signs URLs locally and performs its HEAD/GET calls through OkHttp, so the
-     * agent can only see the network calls. These spans describe the logical storage operation,
-     * which is what a slow or failing upload actually needs to be diagnosed.
-     */
     private final Tracer tracer = GlobalOpenTelemetry.get().getTracer("messaging-attachment-service");
 
     public MinioObjectStorage(MinioClient client, AttachmentProperties properties) {

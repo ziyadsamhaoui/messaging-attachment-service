@@ -13,9 +13,6 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import java.io.IOException;
 import java.util.UUID;
 
-/**
- * Keeps one identifier for a request across the trace, the response header and the logs.
- */
 @Component
 public class CorrelationIdFilter extends OncePerRequestFilter {
 
@@ -38,10 +35,6 @@ public class CorrelationIdFilter extends OncePerRequestFilter {
         }
     }
 
-    /**
-     * An explicit header wins (the gateway forwards the trace id it adopted), otherwise the active
-     * trace id is used, and a random identifier is only generated when there is no trace at all.
-     */
     private static String resolve(String supplied) {
         if (supplied != null && !supplied.isBlank()) {
             return supplied;

@@ -21,14 +21,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
-/**
- * Consumer lag per topic for this service's consumer group.
- *
- * <p>Spring Boot's Kafka client metrics carry only the client id, so they cannot answer which
- * topic is falling behind. This gauge reads the group's committed offsets and the partitions'
- * end offsets through the admin API and keeps the last value when a refresh fails (a broker
- * hiccup must not look like zero lag).
- */
 @Component
 @ConditionalOnProperty(prefix = "badrlink.kafka", name = "enabled", havingValue = "true")
 @Slf4j

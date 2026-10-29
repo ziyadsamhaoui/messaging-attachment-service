@@ -7,14 +7,6 @@ import org.springframework.boot.health.contributor.Health;
 import org.springframework.boot.health.contributor.HealthIndicator;
 import org.springframework.stereotype.Component;
 
-/**
- * Reports object storage as a real dependency.
- *
- * <p>A JVM-only health check would say "UP" while every upload confirmation fails, because the
- * storage bucket is unreachable or was never created. The check performs the cheapest read the
- * MinIO API offers (a bucket existence HEAD) so readiness reflects what the service needs, and
- * fails as soon as the bucket disappears.
- */
 @Component("minio")
 public class MinioHealthIndicator implements HealthIndicator {
 

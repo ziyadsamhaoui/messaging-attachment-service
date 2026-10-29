@@ -9,13 +9,6 @@ import org.springframework.stereotype.Component;
 
 import java.util.concurrent.atomic.AtomicLong;
 
-/**
- * Exposes the state of the outbox as gauges.
- *
- * <p>Values are refreshed on a schedule rather than evaluated during a scrape, so a slow or
- * unavailable database cannot fail the whole metrics endpoint. The cost is bounded staleness
- * of one refresh interval, documented in the observability runbook.
- */
 @Component
 @Slf4j
 public class OutboxBacklogMetrics {
@@ -43,7 +36,6 @@ public class OutboxBacklogMetrics {
             unpublished.set(outboxEventRepository.countUnpublished());
             oldestAgeSeconds.set(Math.round(outboxEventRepository.oldestUnpublishedAgeSeconds()));
         } catch (RuntimeException ex) {
-            // Keep the last known values: a database hiccup must not hide the metric.
             log.warn("could not refresh outbox backlog metrics: {}", ex.getMessage());
         }
     }

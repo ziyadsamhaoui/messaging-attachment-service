@@ -68,8 +68,6 @@ public class OutboxRelay {
         ProducerRecord<String, String> record = new ProducerRecord<>(AttachmentEvents.TOPIC,
                 event.getAggregateId(), objectMapper.writeValueAsString(toEnvelope(event)));
 
-        // Written explicitly so the header exists even without the agent; the agent adds its own
-        // traceparent once the stored context is current below, and both carry the same trace id.
         if (event.getTraceParent() != null) {
             record.headers().add(TraceContextCarrier.TRACEPARENT,
                     event.getTraceParent().getBytes(StandardCharsets.UTF_8));
